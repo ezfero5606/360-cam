@@ -147,7 +147,6 @@
         </a-entity>
         
         <a-entity id="sphere-world"></a-entity>
-        
         <a-sky id="main-sky" rotation="0 -90 0" visible="false"></a-sky>
     </a-scene>
 
@@ -311,7 +310,7 @@
 
         function captureFrameInMemory() {
             isProcessingCapture = true; 
-            targetsArray[currentProgress].yaw = 99999; 
+            // DÜZENLEME: Açı verisini bozan hatalı satır tamamen kaldırıldı.
 
             canvasEl.width = videoEl.videoWidth || 640;
             canvasEl.height = videoEl.videoHeight || 480;
@@ -350,126 +349,84 @@
             }, 100);
         }
 
-        // YENİ: Parçalı kutuları yok edip pürüzsüz küreye çeviren ana birleştirme algoritması
         function startStitchingPhase() {
             isStitchedMode = true;
             
-            // HUD Arayüzünü Kapat
             document.getElementById('center-hud-layer').style.display = 'none';
             document.getElementById('matrix-panel').style.display = 'none';
-            
-            // Yükleme ekranını aç
             document.getElementById('stitching-screen').style.display = 'flex';
 
             setTimeout(() => {
-                // Kamerayı Kapat
                 videoEl.style.display = 'none';
                 if(videoEl.srcObject) {
                     videoEl.srcObject.getTracks().forEach(track => track.stop());
                 }
 
-                // [YENİ]: Kapalı bir tuval (canvas) üzerinde 22 fotoğrafı Equirectangular formatında birleştirme
+                // Arka planda 4K panorama tuvali oluşturuluyor
                 const stitchCanvas = document.createElement('canvas');
-                stitchCanvas.width = 4096; // 4K Panorama
+                stitchCanvas.width = 4096; 
                 stitchCanvas.height = 2048;
                 const sCtx = stitchCanvas.getContext('2d');
 
-                // Arka planı temizle
                 sCtx.fillStyle = "#000000";
                 sCtx.fillRect(0, 0, stitchCanvas.width, stitchCanvas.height);
 
-                let loadedImages = 0;
-
+                // DÜZENLEME: Resimler zaten yüklendiği için senkron döngü ile anında tuvale aktarılıyor (Donma engellendi)
                 targetsArray.forEach((node, idx) => {
                     const img = document.getElementById(`shot-${idx}`);
-                    if (!img) { 
-                        loadedImages++; 
-                        checkCompletion();
-                        return; 
+                    if (!img) return;
+
+                    // Matematiksel Açı - Piksel Dönüşümü
+                    let x = (node.yaw / 360) * stitchCanvas.width;
+                    let y = ((90 - node.pitch) / 180) * stitchCanvas.height;
+
+                    let isZenithNadir = Math.abs(node.pitch) > 70;
+                    let sWidth = isZenithNadir ? stitchCanvas.width : (stitchCanvas.width / 5); 
+                    let sHeight = stitchCanvas.height / 2.2; 
+
+                    sCtx.save();
+                    
+                    // Yumuşak Kenar Harmanlama
+                    sCtx.globalAlpha = 0.95;
+                    
+                    sCtx.drawImage(img, x - sWidth/2, y - sHeight/2, sWidth, sHeight);
+                    
+                    // Kenar Sarması Yönetimi (Seamless Wrap)
+                    if (x + sWidth/2 > stitchCanvas.width) {
+                        sCtx.drawImage(img, x - sWidth/2 - stitchCanvas.width, y - sHeight/2, sWidth, sHeight);
+                    }
+                    if (x - sWidth/2 < 0) {
+                        sCtx.drawImage(img, x - sWidth/2 + stitchCanvas.width, y - sHeight/2, sWidth, sHeight);
                     }
 
-                    img.onload = () => {
-                        loadedImages++;
-
-                        // Küresel Açıdan Tuval Koordinatlarına Matematiksel Dönüşüm
-                        // Equirectangular projeksiyon: Yaw -> X, Pitch -> Y
-                        
-                        let yawRad = (node.yaw * Math.PI) / 180;
-                        let pitchRad = (node.pitch * Math.PI) / 180;
-
-                        // X koordinatı (Yaw: -180'den +180'e -> 0'dan canvas.width'e)
-                        let x = ((node.yaw + 180) / 360) * stitchCanvas.width;
-                        
-                        // Y koordinatı (Pitch: +90'dan -90'e -> 0'dan canvas.height'e)
-                        let y = ((90 - node.pitch) / 180) * stitchCanvas.height;
-
-                        // Fotoğrafların küre üzerinde sarması için boyutlandırma ve örtüşme
-                        let isZenithNadir = Math.abs(node.pitch) > 70;
-                        let sWidth = isZenithNadir ? stitchCanvas.width : (stitchCanvas.width / 8); 
-                        let sHeight = stitchCanvas.height / 3.5;
-
-                        sCtx.save();
-                        
-                        // Pürüzsüz geçiş için harmanlama (Soft Blending)
-                        sCtx.globalAlpha = isZenithNadir ? 0.8 : 0.9;
-                        sCtx.globalCompositeOperation = 'lighter'; // Kenarları eritme efekti
-                        
-                        // Fotoğrafı tuvale çiz (merkezleyerek)
-                        sCtx.drawImage(img, x - sWidth/2, y - sHeight/2, sWidth, sHeight);
-                        
-                        // Panorama kenar sarması için (sağdan taşanı sola çiz)
-                        if (x + sWidth/2 > stitchCanvas.width) {
-                            sCtx.drawImage(img, x - sWidth/2 - stitchCanvas.width, y - sHeight/2, sWidth, sHeight);
-                        }
-                        if (x - sWidth/2 < 0) {
-                            sCtx.drawImage(img, x - sWidth/2 + stitchCanvas.width, y - sHeight/2, sWidth, sHeight);
-                        }
-
-                        sCtx.restore();
-                        checkCompletion();
-                    };
-
-                    // Resim zaten yüklendiyse onload'ı manuel tetikle
-                    if (img.complete) img.onload();
+                    sCtx.restore();
                 });
 
-                function checkCompletion() {
-                    // Tüm resimler tuvale işlendiğinde
-                    if (loadedImages === targetsArray.length) {
-                        applyPanoToSky(stitchCanvas);
-                    }
-                }
+                // Tamamlanan panoramayı küreye giydir
+                applyPanoToSky(stitchCanvas);
 
-            }, 2500); // Yükleme ekranı süresi
+            }, 1000); 
         }
 
-        // YENİ: Oluşturulan tam panoramayı A-Frame küresine giydiren fonksiyon
         function applyPanoToSky(canvas) {
-            // Panoramayı Base64'e çevir (küçük kalite kaybıyla)
             const panoDataURL = canvas.toDataURL('image/jpeg', 0.85);
 
-            // A-assets havuzuna yeni bir resim olarak ekle
             let panoAsset = document.createElement('img');
             panoAsset.id = 'final-pano';
             panoAsset.src = panoDataURL;
             
             panoAsset.onload = () => {
-                // Parçalı 3D dünyayı (kutuları) tamamen gizle
                 sphereWorld.setAttribute('visible', 'false');
                 
-                // Pürüzsüz a-sky küresini göster ve panoramayı giydir
                 mainSky.setAttribute('src', '#final-pano');
                 mainSky.setAttribute('visible', 'true');
                 
-                // Kontrolleri pürüzsüz dokunmatik (pan) moduna al
                 cameraEl.setAttribute('look-controls', 'magicWindowTrackingEnabled: true; touchEnabled: true;');
                 document.querySelector('a-scene').style.pointerEvents = 'auto';
 
-                // Yükleme ekranını kapat ve reset butonunu aç
                 document.getElementById('stitching-screen').style.display = 'none';
                 document.getElementById('reset-btn').style.display = 'block';
 
-                // Blob URL'lerini temizle (Hafıza Yönetimi)
                 targetsArray.forEach(node => {
                     if (node.imageData) URL.revokeObjectURL(node.imageData);
                 });
