@@ -3,201 +3,143 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>360 Pano Cam Pro</title>
+    <title>360 Pano Cam</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background-color: #000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        #camera-view { width: 100%; height: 100%; object-fit: cover; position: absolute; z-index: 1; }
-        #ui-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        #camera-view { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; z-index: 1; }
+        #ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
         .interactive { pointer-events: auto; }
-        header { padding: 20px; background: linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0)); display: flex; justify-content: space-between; align-items: center; color: white; }
-        .status-badge { background: rgba(0, 0, 0, 0.6); padding: 8px 14px; border-radius: 20px; font-size: 14px; font-weight: 600; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 6px; }
-        .status-dot { width: 8px; height: 8px; background-color: #4caf50; border-radius: 50%; display: inline-block; }
-        .status-dot.busy { background-color: #ff9800; animation: pulse 1s infinite alternate; }
-        @keyframes pulse { from { opacity: 0.5; } to { opacity: 1; } }
-        #hud-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; pointer-events: none; }
-        .guide-ring { width: 120px; height: 120px; border: 3px dashed rgba(255, 255, 255, 0.4); border-radius: 50%; position: absolute; transition: transform 0.1s ease-out; display: flex; justify-content: center; align-items: center; }
-        .guide-ring::after { content: ''; width: 14px; height: 14px; background-color: transparent; border: 2px solid white; border-radius: 50%; }
-        .target-box { width: 34px; height: 34px; border: 2px solid #00e5ff; border-radius: 50%; position: absolute; display: flex; justify-content: center; align-items: center; box-shadow: 0 0 15px rgba(0,229,255,0.4); }
-        .target-box::before { content: 'HOLD'; position: absolute; bottom: -22px; font-size: 10px; font-weight: bold; color: #00e5ff; letter-spacing: 1px; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
-        footer { padding: 30px; background: linear-gradient(to top, rgba(0,0,0,0.7), rgba(0,0,0,0)); display: flex; flex-direction: column; align-items: center; gap: 15px; }
-        .progress-container { width: 80%; background: rgba(255,255,255,0.2); height: 6px; border-radius: 3px; overflow: hidden; backdrop-filter: blur(3px); }
-        .progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #00e5ff, #00e676); transition: width 0.3s ease; }
-        .control-btn { background: white; border: none; padding: 14px 28px; border-radius: 30px; font-weight: bold; font-size: 15px; color: #111; box-shadow: 0 4px 15px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 8px; cursor: pointer; }
-        .control-btn:active { transform: scale(0.95); }
-        #preview-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; background: #000; display: none; flex-direction: column; }
-        #pano-canvas { width: 100%; flex-grow: 1; object-fit: contain; background: #111; }
-        .preview-actions { padding: 25px; display: flex; justify-content: space-around; background: #050505; border-top: 1px solid #222; }
-        .btn-secondary { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.1); }
-        #permission-screen { position: absolute; top:0; left:0; width:100%; height:100%; background:#111; z-index:999; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:40px; text-align:center; color:white; }
-        #permission-screen h2 { margin-bottom:15px; font-size:24px; color:#00e5ff; }
-        #permission-screen p { margin-bottom:30px; color:#aaa; font-size:15px; line-height:1.5; }
+        header { background: rgba(0,0,0,0.5); color: white; padding: 15px; text-align: center; font-size: 18px; font-weight: bold; }
+        #hud { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; justify-content: center; align-items: center; pointer-events: none; }
+        .target-box { width: 40px; height: 40px; border: 3px solid #ff3b30; border-radius: 50%; position: absolute; box-shadow: 0 0 10px rgba(255,59,48,0.5); }
+        .target-box::after { content: 'HOLD'; position: absolute; top: 45px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+        footer { background: rgba(0,0,0,0.5); padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .counter { color: white; font-size: 16px; }
+        .progress-bg { width: 80%; background: rgba(255,255,255,0.3); height: 8px; border-radius: 4px; overflow: hidden; }
+        .progress-bar { width: 0%; height: 100%; background: #4cd964; transition: width 0.2s; }
+        .btn { background: #4cd964; color: white; border: none; padding: 12px 24px; border-radius: 20px; font-size: 16px; font-weight: bold; display: none; cursor: pointer; }
+        #preview-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; background: #000; display: none; flex-direction: column; }
+        #pano-canvas { width: 100%; flex-grow: 1; object-fit: contain; }
+        .preview-buttons { padding: 20px; display: flex; justify-content: space-around; background: #111; }
+        .btn-retry { background: #ff3b30; }
+        #init-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #222; z-index: 999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; padding: 20px; text-align: center; }
+        .init-btn { background: #007aff; color: white; border: none; padding: 15px 30px; border-radius: 25px; font-size: 18px; font-weight: bold; margin-top: 20px; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <div id="permission-screen">
-        <h2>360° Kamera Kurulumu</h2>
-        <p>Uygulamanın çalışması için kamera ve hareket sensörü izinleri gereklidir. Lütfen aşağıdaki butona basıp gelen izinleri onaylayın.</p>
-        <button id="start-init-btn" class="control-btn interactive">Sistemi Başlat</button>
+    <div id="init-screen">
+        <h2>360° Kamera Başlatıcı</h2>
+        <p>Lütfen kamera ve hareket sensörü izinlerini onaylayın.</p>
+        <button id="btn-start" class="init-btn interactive">Kamerayı Aç</button>
     </div>
 
     <video id="camera-view" autoplay playsinline muted></video>
 
-    <div id="ui-container">
-        <header>
-            <div class="status-badge">
-                <span id="status-dot" class="status-dot"></span>
-                <span id="status-text">HAZIR</span>
-            </div>
-            <div class="status-badge" style="font-family: monospace;">
-                <span id="captured-count">0</span> / 22 KARE
-            </div>
-        </header>
-
-        <div id="hud-overlay">
-            <div id="guide-ring" class="guide-ring"></div>
-            <div id="target-box" class="target-box" style="display: none;"></div>
+    <div id="ui-overlay">
+        <header id="status-text">Cihazı Hedefe Doğru Çevirin</header>
+        <div id="hud">
+            <div id="target-box" class="target-box"></div>
         </div>
-
         <footer>
-            <div class="progress-container">
+            <div id="counter" class="counter">Çekilen Kare: 0 / 22</div>
+            <div class="progress-bg">
                 <div id="progress-bar" class="progress-bar"></div>
             </div>
-            <button id="action-btn" class="control-btn interactive" style="display: none;">
-                🔄 Resmi Birleştir
-            </button>
+            <button id="btn-stitch" class="btn interactive">🔄 Resmi Birleştir</button>
         </footer>
     </div>
 
-    <div id="preview-container">
+    <div id="preview-screen">
         <canvas id="pano-canvas"></canvas>
-        <div class="preview-actions">
-            <button id="btn-retry" class="control-btn btn-secondary interactive">🔄 Yeniden Çek</button>
-            <button id="btn-save" class="control-btn interactive" style="background: #00e676; color: white;">💾 Galeriye Kaydet</button>
+        <div class="preview-buttons">
+            <button id="btn-restart" class="btn btn-retry interactive">🔄 Yeniden Dene</button>
+            <button id="btn-download" class="btn interactive" style="display:block;">💾 Galeriye Kaydet</button>
         </div>
     </div>
 
     <script>
         const video = document.getElementById('camera-view');
-        const guideRing = document.getElementById('guide-ring');
         const targetBox = document.getElementById('target-box');
-        const statusDot = document.getElementById('status-dot');
         const statusText = document.getElementById('status-text');
-        const countText = document.getElementById('captured-count');
+        const counter = document.getElementById('counter');
         const progressBar = document.getElementById('progress-bar');
-        const actionBtn = document.getElementById('action-btn');
-        const previewContainer = document.getElementById('preview-container');
+        const btnStitch = document.getElementById('btn-stitch');
+        const previewScreen = document.getElementById('preview-screen');
         const panoCanvas = document.getElementById('pano-canvas');
-        const permissionScreen = document.getElementById('permission-screen');
+        const initScreen = document.getElementById('init-screen');
 
-        let currentYaw = 0, currentPitch = 0, currentRoll = 0;
+        let currentYaw = 0, currentPitch = 0;
         let isCapturing = false;
         let activeTargetIndex = 0;
         let capturedPoints = [];
 
-        // 22 Noktalı Optimize Küresel Matris (10 Karşı Düzlük, 5 Üst Kademe, 5 Alt Kademe, 1 Tepe, 1 Taban Yama)
+        // 22 Noktalı Küresel Çekim Şablonu
         const capturePointsGrid = [
-            // Row 1: Karşı Düz Sıra (Açı: 0° / Göz Hizası) - 10 Nokta (Her 36 derecede bir)
+            // Karşı Sıra (10 Nokta)
             { yaw: 0, pitch: 0, row: 'mid' }, { yaw: 36, pitch: 0, row: 'mid' }, { yaw: 72, pitch: 0, row: 'mid' }, 
             { yaw: 108, pitch: 0, row: 'mid' }, { yaw: 144, pitch: 0, row: 'mid' }, { yaw: 180, pitch: 0, row: 'mid' }, 
             { yaw: -144, pitch: 0, row: 'mid' }, { yaw: -108, pitch: 0, row: 'mid' }, { yaw: -72, pitch: 0, row: 'mid' }, { yaw: -36, pitch: 0, row: 'mid' },
-
-            // Row 2: Üst Kademe Gökyüzü (Açı: +32° Yukarı) - 5 Nokta (Her 72 derecede bir)
-            { yaw: 0, pitch: 32, row: 'top' }, { yaw: 72, pitch: 32, row: 'top' }, { yaw: 144, pitch: 32, row: 'top' }, 
-            { yaw: -144, pitch: 32, row: 'top' }, { yaw: -72, pitch: 32, row: 'top' },
-
-            // Row 3: Alt Kademe Zemin (Açı: -32° Aşağı) - 5 Nokta (Her 72 derecede bir)
-            { yaw: 0, pitch: -32, row: 'bottom' }, { yaw: 72, pitch: -32, row: 'bottom' }, { yaw: 144, pitch: -32, row: 'bottom' }, 
-            { yaw: -144, pitch: -32, row: 'bottom' }, { yaw: -72, pitch: -32, row: 'bottom' },
-
-            // Row 4 & 5: Tam Tepe (+75°) ve Alt Koruma Nadir Yaması (-75°)
-            { yaw: 0, pitch: 75, row: 'zenith' },
-            { yaw: 0, pitch: -75, row: 'nadir' }
+            // Üst Sıra (5 Nokta)
+            { yaw: 0, pitch: 32, row: 'top' }, { yaw: 72, pitch: 32, row: 'top' }, { yaw: 144, pitch: 32, row: 'top' }, { yaw: -144, pitch: 32, row: 'top' }, { yaw: -72, pitch: 32, row: 'top' },
+            // Alt Sıra (5 Nokta)
+            { yaw: 0, pitch: -32, row: 'bottom' }, { yaw: 72, pitch: -32, row: 'bottom' }, { yaw: 144, pitch: -32, row: 'bottom' }, { yaw: -144, pitch: -32, row: 'bottom' }, { yaw: -72, pitch: -32, row: 'bottom' },
+            // Tepe ve Taban Yaması
+            { yaw: 0, pitch: 75, row: 'zenith' }, { yaw: 0, pitch: -75, row: 'nadir' }
         ];
 
-        document.getElementById('start-init-btn').addEventListener('click', async () => {
+        document.getElementById('btn-start').addEventListener('click', async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
                 video.srcObject = stream;
                 
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     const permission = await DeviceOrientationEvent.requestPermission();
-                    if (permission === 'granted') { window.addEventListener('deviceorientation', handleOrientation); initSystem(); }
-                    else { alert('Sensör izni reddedildi!'); }
+                    if (permission === 'granted') { window.addEventListener('deviceorientation', handleOrientation); initScreen.style.display = 'none'; }
+                    else { alert('Sensör izni reddedildi.'); }
                 } else {
                     window.addEventListener('deviceorientation', handleOrientation);
-                    initSystem();
+                    initScreen.style.display = 'none';
                 }
             } catch (err) {
-                alert('Kamera başlatılamadı veya izin verilmedi: ' + err.message);
+                alert('Hata: ' + err.message);
             }
         });
-
-        function initSystem() {
-            permissionScreen.style.display = 'none';
-            targetBox.style.style = 'block';
-            updateTargetUI();
-        }
 
         function handleOrientation(event) {
             if (!event.alpha && !event.beta) return;
             
-            // Cihaz duruş açılarını normalize etme
             let alpha = event.alpha; 
             let beta = event.beta;   
-            
             let yaw = alpha > 180 ? alpha - 360 : alpha;
-            let pitch = beta - 70; // Dik tutuş kalibrasyonu
+            let pitch = beta - 70; 
             
             currentYaw = -yaw; 
             currentPitch = -pitch;
-            currentRoll = event.gamma;
 
-            // Jiroskop verisini ekrandaki nişangah halkasına yansıtma
-            if (targetBox.style.display !== 'none' && activeTargetIndex < capturePointsGrid.length) {
+            if (activeTargetIndex < capturePointsGrid.length) {
                 const target = capturePointsGrid[activeTargetIndex];
-                
                 let diffYaw = target.yaw - currentYaw;
                 if (diffYaw > 180) diffYaw -= 360;
                 if (diffYaw < -180) diffYaw += 360;
                 let diffPitch = target.pitch - currentPitch;
 
+                // Eski sade kırmızı hedef kutusunun ekrandaki yerini güncelleme
                 const scale = 8; 
                 let x = diffYaw * scale;
                 let y = -diffPitch * scale;
+                targetBox.style.transform = `translate(${x}px, ${y}px)`;
 
-                let maxOffset = window.innerWidth / 2 - 40;
-                x = Math.max(-maxOffset, Math.min(maxOffset, x));
-                y = Math.max(-maxOffset, Math.min(maxOffset, y));
-
-                guideRing.style.transform = `translate(${x}px, ${y}px)`;
-
-                // Tetiklenme Alanına Giriş Kontrolü (Hata payı: 3 derece)
+                // Tetiklenme alanı (3 derece hata payı)
                 if (Math.abs(diffYaw) < 3 && Math.abs(diffPitch) < 3 && !isCapturing) {
                     triggerCapture();
                 }
             }
         }
 
-        function updateTargetUI() {
-            if (activeTargetIndex < capturePointsGrid.length) {
-                targetBox.style.display = 'flex';
-                statusText.innerText = "HEDEFE ODAKLAN";
-                statusDot.className = "status-dot";
-            } else {
-                targetBox.style.display = 'none';
-                guideRing.style.display = 'none';
-                statusText.innerText = "ÇEKİMLER BİTTİ";
-                statusDot.className = "status-dot";
-                actionBtn.style.display = 'block';
-            }
-        }
-
         function triggerCapture() {
             isCapturing = true;
-            statusText.innerText = "KAYDEDİLİYOR...";
-            statusDot.className = "status-dot busy";
+            statusText.innerText = "Fotoğraf Kaydediliyor...";
 
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
@@ -205,7 +147,7 @@
             const ctx = canvas.getContext('2d');
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // KRİTİK OPTİMİZASYON: Kaliteyi 0.55'e düşürerek RAM yükünü yarı yarıya azalttık
+            // RAM Dostu Ayar: Kaliteyi 0.55 yaptık
             const dataUrl = canvas.toDataURL('image/jpeg', 0.55);
 
             capturedPoints.push({
@@ -216,100 +158,86 @@
             });
 
             activeTargetIndex++;
-            countText.innerText = activeTargetIndex;
+            counter.innerText = `Çekilen Kare: ${activeTargetIndex} / 22`;
             progressBar.style.width = `${(activeTargetIndex / capturePointsGrid.length) * 100}%`;
 
-            // KRİTİK OPTİMİZASYON: Gecikmeyi 400ms'ye çıkararak tarayıcının kilitlenmesini engelledik
-            setTimeout(() => {
-                isCapturing = false;
-                updateTargetUI();
-            }, 400);
+            if (activeTargetIndex < capturePointsGrid.length) {
+                // Güvenli Bekleme Payı: Donmayı önlemek için 400ms yaptık
+                setTimeout(() => {
+                    isCapturing = false;
+                    statusText.innerText = "Cihazı Hedefe Doğru Çevirin";
+                }, 400);
+            } else {
+                targetBox.style.display = 'none';
+                statusText.innerText = "Çekim Tamamlandı!";
+                btnStitch.style.display = 'block';
+            }
         }
 
-        actionBtn.addEventListener('click', () => {
-            statusText.innerText = "3D BİRLEŞTİRİLİYOR...";
-            statusDot.className = "status-dot busy";
-            
+        btnStitch.addEventListener('click', () => {
+            statusText.innerText = "Panorama Oluşturuluyor...";
             setTimeout(() => {
-                renderStitchedPanorama();
-            }, 600);
+                renderPanorama();
+            }, 500);
         });
 
-        function renderStitchedPanorama() {
-            // Akıllı Akışkan Grid Birleştirme Motoru (Equirectangular Projeksiyon Simülasyonu)
+        function renderPanorama() {
             panoCanvas.width = 2400;
             panoCanvas.height = 1200;
             const pCtx = panoCanvas.getContext('2d');
-
-            // Arka planı temizle ve taban alt koruma rengini ata
             pCtx.fillStyle = '#f0f0f0';
             pCtx.fillRect(0, 0, panoCanvas.width, panoCanvas.height);
 
             const sliceWidth = panoCanvas.width / 10; 
             const sliceHeight = panoCanvas.height / 3; 
 
-            // Gelişmiş 22 Noktalı Küresel Yama Algoritması
             capturedPoints.forEach(point => {
                 const img = new Image();
                 img.src = point.image;
-                
                 img.onload = () => {
                     let dx = 0, dy = 0, dw = sliceWidth, dh = sliceHeight;
-
-                    let normYaw = point.yaw;
-                    if (normYaw < 0) normYaw += 360;
+                    let normYaw = point.yaw < 0 ? point.yaw + 360 : point.yaw;
                     let colIndex = Math.floor((normYaw / 360) * 10) % 10;
 
                     if (point.row === 'mid') {
-                        dx = colIndex * sliceWidth;
-                        dy = sliceHeight; 
+                        dx = colIndex * sliceWidth; dy = sliceHeight; 
                     } else if (point.row === 'top') {
                         let topColIndex = Math.floor((normYaw / 360) * 5) % 5;
-                        dx = topColIndex * (sliceWidth * 2);
-                        dy = 0;
-                        dw = sliceWidth * 2;
+                        dx = topColIndex * (sliceWidth * 2); dy = 0; dw = sliceWidth * 2;
                     } else if (point.row === 'bottom') {
                         let botColIndex = Math.floor((normYaw / 360) * 5) % 5;
-                        dx = botColIndex * (sliceWidth * 2);
-                        dy = sliceHeight * 2;
-                        dw = sliceWidth * 2;
+                        dx = botColIndex * (sliceWidth * 2); dy = sliceHeight * 2; dw = sliceWidth * 2;
                     } else if (point.row === 'zenith') {
                         dx = 0; dy = 0; dw = panoCanvas.width; dh = sliceHeight / 2;
                     } else if (point.row === 'nadir') {
                         dx = 0; dy = panoCanvas.height - (sliceHeight / 2); dw = panoCanvas.width; dh = sliceHeight / 2;
                     }
-
-                    // Yumuşak geçişli kenar birleştirme maskesi (Feathering)
-                    pCtx.save();
-                    pCtx.globalAlpha = 0.92;
                     pCtx.drawImage(img, dx, dy, dw, dh);
-                    pCtx.restore();
                 };
             });
 
-            // Görüntüyü ekrana bas
             setTimeout(() => {
-                previewContainer.style.display = 'flex';
-            }, 1200);
+                previewScreen.style.display = 'flex';
+            }, 1000);
         }
 
-        document.getElementById('btn-retry').addEventListener('click', () => {
+        document.getElementById('btn-restart').addEventListener('click', () => {
             capturedPoints = [];
             activeTargetIndex = 0;
-            countText.innerText = "0";
+            counter.innerText = "Çekilen Kare: 0 / 22";
             progressBar.style.width = "0%";
-            previewContainer.style.display = 'none';
-            actionBtn.style.display = 'none';
-            guideRing.style.display = 'flex';
-            updateTargetUI();
+            previewScreen.style.display = 'none';
+            btnStitch.style.display = 'none';
+            targetBox.style.display = 'block';
+            isCapturing = false;
+            statusText.innerText = "Cihazı Hedefe Doğru Çevirin";
         });
 
-        document.getElementById('btn-save').addEventListener('click', () => {
+        document.getElementById('btn-download').addEventListener('click', () => {
             const link = document.createElement('a');
-            link.download = `360_Panorama_${Date.now()}.jpg`;
+            link.download = `360_Panorama.jpg`;
             link.href = panoCanvas.toDataURL('image/jpeg', 0.90);
             link.click();
-            alert('Panorama başarıyla oluşturuldu ve indirme başlatıldı!');
         });
     </script>
 </body>
