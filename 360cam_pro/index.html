@@ -82,7 +82,7 @@
         .dot.active { background: #00ea46; box-shadow: 0 0 8px #00ea46; }
         .dot.current { background: #ffffff; transform: scale(1.3); box-shadow: 0 0 8px #fff; }
 
-        #shutter-flash { position: fixed; inset: 0; background: #fff; opacity: 0; z-index: 500; pointer-events: none; transition: opacity 0.08s ease-out; }
+        #shutter-flash { position: fixed; inset: 0; background: #fff; opacity: 0; z-index: 500; pointer-events: none; transition: opacity 0.05s ease-out; }
 
         #stitching-screen {
             position: fixed; inset: 0; background: #000; z-index: 999;
@@ -308,21 +308,22 @@
             
             ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
             
-            // OPTİMİZASYON 1: Fotoğraf kalitesini 0.55'e düşürerek RAM'i rahatlattık
+            // Fotoğraf kalitesi RAM dostu seviyede tutuluyor
             const dataURL = canvasEl.toDataURL('image/jpeg', 0.55);
-            
             targetsArray[currentProgress].imageData = dataURL;
 
+            // DÜZENLEME: Flaş ekranını hemen opak yapıyoruz
             const flash = document.getElementById('shutter-flash');
             flash.style.opacity = "1";
             
-            // OPTİMİZASYON 2: Gecikmeyi 400ms yaparak telefon işlemcisinin nefes almasını sağladık
+            // DÜZENLEME: Flaş süresi 400ms'den gerçek kamera hızı olan 100ms'ye indirildi.
+            // Böylece şak diye sönüp işlemciyi kilitlemeyecek.
             setTimeout(() => {
                 flash.style.opacity = "0";
                 resetHoldUI();
                 currentProgress++;
                 syncNavigationState();
-            }, 400);
+            }, 100);
         }
 
         function startStitchingPhase() {
