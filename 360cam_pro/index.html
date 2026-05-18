@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>360 Photo Cam - Stitching Pro</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <style>
+        * { box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        
+        #webcam-fallback {
+            position: fixed; inset: 0; width: 100%; height: 100%;
+            object-fit: cover; z-index: 1; pointer-events: none;
+        }
+
+        a-scene {
+            position: absolute; inset: 0; width: 100%; height: 100%;
+            z-index: 5; pointer-events: none;
+        }
+
+        #permission-screen {
+            position: fixed; inset: 0; background: #0b0b0b; z-index: 999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: white; text-align: center; padding: 30px;
+        }
+        .intro-text { font-size: 18px; color: #aaa; margin-bottom: 30px; max-width: 280px; line-height: 1.5; }
+        .start-btn {
+            background: #00ea46; color: black; border: none; padding: 18px 45px;
+            font-size: 16px; font-weight: bold; border-radius: 30px; cursor: pointer;
+            box-shadow: 0 6px 20px rgba(0,234,70,0.4);
+        }
+
+        #center-hud-layer {
+            position: fixed; inset: 0; z-index: 100;
+            pointer-events: none; display: none;
+        }
+        
+        #fixed-white-ball {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 74px; height: 74px;
+            background: rgba(255, 255, 255, 0.95); border-radius: 50%;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            display: flex; align-items: center; justify-content: center;
+        }
+        #hold-text {
+            color: #000; font-size: 12px; font-weight: 900; 
+            text-transform: uppercase; letter-spacing: 1px; z-index: 2;
+        }
+        #countdown-svg {
+            position: absolute; top: -3px; left: -3px; width: 80px; height: 80px;
+            transform: rotate(-90deg); z-index: 1; pointer-events: none;
+        }
+        #countdown-circle {
+            transition: stroke-dashoffset 0.05s linear;
+        }
+
+        #radar-arrow {
+            position: absolute; top: 50%; left: 50%;
+            width: 116px; height: 116px;
+            margin-left: -58px; margin-top: -58px;
+        }
+        #radar-arrow::before {
+            content: '';
+            position: absolute; top: -15px; left: 50%;
+            transform: translateX(-50%);
+            width: 0; height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 16px solid #ffffff;
+        }
+
+        #matrix-panel {
+            position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.6); padding: 14px 20px; border-radius: 20px;
+            display: flex; flex-direction: column; gap: 6px; align-items: center;
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 110; display: none;
+        }
+        .matrix-row { display: flex; gap: 6px; justify-content: center; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #133a1c; transition: all 0.2s; }
+        .dot.active { background: #00ea46; box-shadow: 0 0 8px #00ea46; }
+        .dot.current { background: #ffffff; transform: scale(1.3); box-shadow: 0 0 8px #fff; }
+
+        #shutter-flash { position: fixed; inset: 0; background: #fff; opacity: 0; z-index: 500; pointer-events: none; transition: opacity 0.08s ease-out; }
+
+        /* [YENİ] Birleştirme ve Yükleme Ekranı Tasarımı */
+        #stitching-screen {
+            position: fixed; inset: 0; background: #000; z-index: 999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: white; display: none;
+        }
+        .spinner {
+            width: 50px; height: 50px; border: 5px solid #133a1c; border-top: 5px solid #00ea46;
+            border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* [YENİ] Reset Butonu (360 modu için) */
+        #reset-btn {
+            position: fixed; top: 30px; right: 30px; z-index: 200;
+            background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4);
+            padding: 12px 24px; border-radius: 20px; font-weight: bold; backdrop-filter: blur(10px);
+            display: none; cursor: pointer; pointer-events: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <video id="webcam-fallback" autoplay playsinline muted></video>
+    <canvas id="capture-canvas" style="display: none;"></canvas>
+    <div id="shutter-flash"></div>
+
+    <div id="permission-screen">
+        <h2 style="margin-bottom: 10px; color: #00ea46;">360° CAM STITCH-PRO</h2>
+        <p class="intro-text">Hizalama noktalarında kamerayı sabit tutun. Çekim bittiğinde otomatik birleştirme başlayacaktır.</p>
+        <button class="start-btn" onclick="initTwinSystem()">Sistemi Başlat</button>
+    </div>
+
+    <div id="stitching-screen">
+        <div class="spinner"></div>
+        <h3 style="margin: 0; letter-spacing: 1px;">FOTOĞRAFLAR BİRLEŞTİRİLİYOR</h3>
+        <p style="color: #888; font-size: 14px; margin-top: 8px;">22 Alan Eşleştiriliyor & Nadir Yaması Uygulanıyor...</p>
+    </div>
+
+    <button id="reset-btn" onclick="document.location.reload()">Yeni Çekim</button>
+
+    <div id="center-hud-layer">
+        <div id="radar-arrow"></div>
+        <div id="fixed-white-ball">
+            <div id="hold-text"></div>
+            <svg id="countdown-svg" viewBox="0 0 80 80">
+                <circle cx="40" cy="40" r="37" stroke="#00ea46" stroke-width="4" fill="none" id="countdown-circle" stroke-dasharray="232" stroke-dashoffset="232"/>
+            </svg>
+        </div>
+    </div>
+
+    <div id="matrix-panel">
+        <div class="matrix-row" id="row-top"></div>
+        <div class="matrix-row" id="row-mid"></div>
+        <div class="matrix-row" id="row-bot"></div>
+    </div>
+
+    <a-scene renderer="alpha: true; colorManagement: true;" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+        <a-entity id="rig" rotation="0 0 0">
+            <a-entity camera look-controls="magicWindowTrackingEnabled: true; touchEnabled: true;" id="main-cam" position="0 0 0"></a-entity>
+        </a-entity>
+        <a-entity id="sphere-world"></a-entity>
+    </a-scene>
+
+    <script>
+        let currentProgress = 0;
+        let targetsArray = [];
+        let isStitchedMode = false;
+        
+        const sphereWorld = document.getElementById('sphere-world');
+        const cameraEl = document.getElementById('main-cam');
+        const arrowEl = document.getElementById('radar-arrow');
+        const videoEl = document.getElementById('webcam-fallback');
+        const canvasEl = document.getElementById('capture-canvas');
+
+        let isHolding = false;
+        let holdStartTime = 0;
+        const HOLD_DURATION = 1200; 
+
+        function generateSphericalMap() {
+            // Sıralama: Karşı (10), Üst (5), Tavan (1), Alt (5), Taban (1)
+            for(let i=0; i<10; i++) targetsArray.push({ pitch: 0, yaw: i*36, row: 'row-mid', type: 'rect' });
+            for(let i=0; i<5; i++) targetsArray.push({ pitch: 35, yaw: i*72, row: 'row-top', type: 'rect' });
+            targetsArray.push({ pitch: 90, yaw: 0, row: 'row-top', type: 'circle' });
+            for(let i=0; i<5; i++) targetsArray.push({ pitch: -35, yaw: i*72, row: 'row-bot', type: 'rect' });
+            targetsArray.push({ pitch: -90, yaw: 0, row: 'row-bot', type: 'circle' });
+
+            targetsArray.forEach((node, idx) => {
+                let pivot = document.createElement('a-entity');
+                pivot.setAttribute('id', `pivot-${idx}`);
+                pivot.setAttribute('rotation', `${node.pitch} ${-node.yaw} 0`);
+                
+                let targetEl = document.createElement('a-plane');
+                // Önizleme esnasında fotoğrafların tam oturması için tavan/tabanı da düzlemsel geniş panellere çeviriyoruz
+                targetEl.setAttribute('width', node.type === 'circle' ? '2.5' : '1.3');
+                targetEl.setAttribute('height', node.type === 'circle' ? '2.5' : '1.7');
+                targetEl.setAttribute('position', '0 0 -3.5');
+
+                targetEl.setAttribute('id', `box-${idx}`);
+                targetEl.setAttribute('material', 'color: #00ea46; opacity: 0.15; shader: flat; side: double; transparent: true;');
+                
+                let centerDot = document.createElement('a-circle');
+                centerDot.setAttribute('radius', '0.04');
+                centerDot.setAttribute('position', '0 0 0.02');
+                centerDot.setAttribute('material', 'color: white; opacity: 0.6; shader: flat;');
+                centerDot.className = 'hud-element';
+                targetEl.appendChild(centerDot);
+                
+                pivot.appendChild(targetEl);
+                sphereWorld.appendChild(pivot);
+            });
+        }
+
+        function buildMatrixHUD() {
+            targetsArray.forEach((node, idx) => {
+                let dot = document.createElement('div');
+                dot.className = 'dot';
+                dot.id = `dot-${idx}`;
+                document.getElementById(node.row).appendChild(dot);
+            });
+        }
+
+        async function initTwinSystem() {
+            try {
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    const permission = await DeviceOrientationEvent.requestPermission();
+                    if (permission !== 'granted') { return alert("Sensör izni reddedildi."); }
+                }
+
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+                videoEl.srcObject = stream;
+
+                document.getElementById('permission-screen').style.display = 'none';
+                document.getElementById('center-hud-layer').style.display = 'block';
+                document.getElementById('matrix-panel').style.display = 'flex';
+
+                generateSphericalMap();
+                buildMatrixHUD();
+                syncNavigationState();
+                runTrackingEngine();
+
+            } catch (err) {
+                alert("Kamera/Sensör hatası: " + err.message);
+            }
+        }
+
+        function syncNavigationState() {
+            if (currentProgress >= targetsArray.length) {
+                startStitchingPhase();
+                return;
+            }
+
+            if (currentProgress > 0) {
+                let prevBox = document.getElementById(`box-${currentProgress-1}`);
+                if (prevBox) prevBox.setAttribute('material', 'color: #00ea46; opacity: 0.2;');
+                
+                let prevDot = document.getElementById(`dot-${currentProgress-1}`);
+                if (prevDot) { prevDot.classList.remove('current'); prevDot.classList.add('active'); }
+            }
+
+            let activeBox = document.getElementById(`box-${currentProgress}`);
+            if (activeBox) activeBox.setAttribute('material', 'color: #00ea46; opacity: 0.85;');
+
+            let activeDot = document.getElementById(`dot-${currentProgress}`);
+            if (activeDot) activeDot.classList.add('current');
+        }
+
+        function runTrackingEngine() {
+            requestAnimationFrame(runTrackingEngine);
+            if (isStitchedMode || currentProgress >= targetsArray.length) return;
+
+            let camRot = cameraEl.getAttribute('rotation');
+            if (!camRot) return;
+
+            let target = targetsArray[currentProgress];
+
+            let diffPitch = target.pitch - camRot.x;
+            diffPitch = (diffPitch + 180) % 360 - 180;
+
+            let diffYaw = (-target.yaw) - camRot.y;
+            diffYaw = (diffYaw + 180) % 360 - 180;
+
+            if (Math.abs(diffYaw) > 8 || Math.abs(diffPitch) > 8) {
+                arrowEl.style.display = "block";
+                let angleDeg = Math.atan2(-diffYaw, diffPitch) * (180 / Math.PI);
+                arrowEl.style.transform = `rotate(${angleDeg}deg)`;
+            } else {
+                arrowEl.style.display = "none";
+            }
+
+            let isZenithNadir = Math.abs(target.pitch) === 90;
+            let yawThreshold = isZenithNadir ? 360 : 5;
+            let pitchThreshold = 5;
+
+            if (Math.abs(diffPitch) < pitchThreshold && Math.abs(diffYaw) < yawThreshold) {
+                if (!isHolding) {
+                    isHolding = true;
+                    holdStartTime = performance.now();
+                    document.getElementById('hold-text').innerText = 'HOLD';
+                } else {
+                    let elapsed = performance.now() - holdStartTime;
+                    let progress = Math.min(elapsed / HOLD_DURATION, 1);
+                    document.getElementById('countdown-circle').style.strokeDashoffset = 232 - (232 * progress);
+
+                    if (elapsed >= HOLD_DURATION) {
+                        captureFrameInMemory();
+                    }
+                }
+            } else {
+                if (isHolding) { resetHoldUI(); }
+            }
+        }
+
+        function resetHoldUI() {
+            isHolding = false;
+            document.getElementById('hold-text').innerText = '';
+            document.getElementById('countdown-circle').style.strokeDashoffset = 232;
+        }
+
+        // [YENİ] Kameradan o anki kareyi yakalayıp hafızaya alan fonksiyon
+        function captureFrameInMemory() {
+            targetsArray[currentProgress].yaw = 99999; // Çift tetiklemeyi önle
+
+            canvasEl.width = videoEl.videoWidth || 1280;
+            canvasEl.height = videoEl.videoHeight || 720;
+            const ctx = canvasEl.getContext('2d');
+            
+            // Aynalama olmaması için canvas'ı düzeltip çiziyoruz
+            ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+            const dataURL = canvasEl.toDataURL('image/jpeg', 0.85);
+            
+            // Fotoğrafı ilgili indeks alanına kaydet
+            targetsArray[currentProgress].imageData = dataURL;
+
+            // Flaş patlat ve ilerle
+            const flash = document.getElementById('shutter-flash');
+            flash.style.opacity = "1";
+            
+            setTimeout(() => {
+                flash.style.opacity = "0";
+                resetHoldUI();
+                currentProgress++;
+                syncNavigationState();
+            }, 100);
+        }
+
+        // [YENİ] Birleştirme Aşaması Algoritması
+        function startStitchingPhase() {
+            isStitchedMode = true;
+            
+            // HUD Arayüzünü Kapat
+            document.getElementById('center-hud-layer').style.display = 'none';
+            document.getElementById('matrix-panel').style.display = 'none';
+            
+            // Yükleme ekranını aç
+            document.getElementById('stitching-screen').style.display = 'flex';
+
+            setTimeout(() => {
+                // Canlı videoyu kapat, artık sadece çektiğimiz fotoğrafları göreceğiz
+                videoEl.style.display = 'none';
+                if(videoEl.srcObject) {
+                    videoEl.srcObject.getTracks().forEach(track => track.stop());
+                }
+
+                // Tüm panellerin dokularını çektiğimiz fotoğraflarla güncelle (3D Projeksiyon)
+                targetsArray.forEach((node, idx) => {
+                    let box = document.getElementById(`box-${idx}`);
+                    if (box && node.imageData) {
+                        // Yeşil kutuyu şeffaf, tam opak fotoğrafa dönüştür
+                        box.setAttribute('material', `src: ${node.imageData}; shader: flat; side: double; opacity: 1; transparent: false;`);
+                        // Ortadaki beyaz noktaları temizle
+                        let dots = box.querySelectorAll('.hud-element');
+                        dots.forEach(d => d.remove());
+                    }
+                });
+
+                // Taban (Nadir) alanındaki boşluğu yumuşatmak için taban paneline ekstra boyut veriyoruz
+                let nadirBox = document.getElementById(`box-21`); // En son eklenen taban
+                if(nadirBox) { nadirBox.setAttribute('width', '4'); nadirBox.setAttribute('height', '4'); }
+
+                // Yükleme ekranını kapat, önizlemeyi ve reset butonunu aç
+                document.getElementById('stitching-screen').style.display = 'none';
+                document.getElementById('reset-btn').style.display = 'block';
+                
+                // A-Scene'e dokunma (Pan) özelliğini aktif et ki kullanıcı eliyle de döndürebilsin
+                document.querySelector('a-scene').style.pointerEvents = 'auto';
+
+            }, 2500); // 2.5 saniye yapay işlemci gecikmesi (Stitching efekti)
+        }
+    </script>
+</body>
+</html>
