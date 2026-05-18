@@ -140,6 +140,8 @@
     </div>
 
     <a-scene renderer="alpha: true; colorManagement: true;" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+        <a-assets id="asset-pool"></a-assets>
+
         <a-entity id="rig" rotation="0 0 0">
             <a-entity camera look-controls="magicWindowTrackingEnabled: true; touchEnabled: true;" id="main-cam" position="0 0 0"></a-entity>
         </a-entity>
@@ -150,13 +152,14 @@
         let currentProgress = 0;
         let targetsArray = [];
         let isStitchedMode = false;
-        let isProcessingCapture = false; // Çekim anında motorun kilitlenmesini önlemek için kilit
+        let isProcessingCapture = false;
         
         const sphereWorld = document.getElementById('sphere-world');
         const cameraEl = document.getElementById('main-cam');
         const arrowEl = document.getElementById('radar-arrow');
         const videoEl = document.getElementById('webcam-fallback');
         const canvasEl = document.getElementById('capture-canvas');
+        const assetPool = document.getElementById('asset-pool');
 
         let isHolding = false;
         let holdStartTime = 0;
@@ -247,7 +250,7 @@
             let activeDot = document.getElementById(`dot-${currentProgress}`);
             if (activeDot) activeDot.classList.add('current');
             
-            isProcessingCapture = false; // Çekim ve geçiş bitti, motoru serbest bırak
+            isProcessingCapture = false;
         }
 
         function runTrackingEngine() {
@@ -303,7 +306,7 @@
         }
 
         function captureFrameInMemory() {
-            isProcessingCapture = true; // Çekim başladı, çakışmayı önlemek için motoru kilitle
+            isProcessingCapture = true;
             targetsArray[currentProgress].yaw = 99999; 
 
             canvasEl.width = videoEl.videoWidth || 640;
@@ -312,11 +315,16 @@
             
             ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
             
-            // YENİ OPTİMİZASYON: toDataURL yerine toBlob kullanarak RAM yığılmasını engelledik
             canvasEl.toBlob((blob) => {
                 if(blob) {
                     const blobURL = URL.createObjectURL(blob);
                     targetsArray[currentProgress].imageData = blobURL;
+
+                    // DÜZENLEME: Resmi önce görünmez bir şekilde asset havuzuna ekliyoruz ki A-Frame tanısın
+                    let imgAsset = document.createElement('img');
+                    imgAsset.id = `shot-${currentProgress}`;
+                    imgAsset.src = blobURL;
+                    assetPool.appendChild(imgAsset);
                 }
 
                 const flash = document.getElementById('shutter-flash');
@@ -327,7 +335,7 @@
                     resetHoldUI();
                     currentProgress++;
                     syncNavigationState();
-                }, 100); // Gerçekçi hızlı flaş patlaması
+                }, 100);
             }, 'image/jpeg', 0.40);
         }
 
@@ -336,7 +344,6 @@
             
             document.getElementById('center-hud-layer').style.display = 'none';
             document.getElementById('matrix-panel').style.display = 'none';
-            
             document.getElementById('stitching-screen').style.display = 'flex';
 
             setTimeout(() => {
@@ -348,7 +355,8 @@
                 targetsArray.forEach((node, idx) => {
                     let box = document.getElementById(`box-${idx}`);
                     if (box && node.imageData) {
-                        box.setAttribute('material', `src: ${node.imageData}; shader: flat; side: double; opacity: 1; transparent: false;`);
+                        // DÜZENLEME: Doğrudan blobURL yerine asset havuzundaki ID'yi (#shot-x) bağlıyoruz
+                        box.setAttribute('material', `src: #shot-${idx}; shader: flat; side: double; opacity: 1; transparent: false; color: #ffffff;`);
                         let dots = box.querySelectorAll('.hud-element');
                         dots.forEach(d => d.remove());
                     }
