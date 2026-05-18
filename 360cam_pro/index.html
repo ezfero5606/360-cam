@@ -306,7 +306,7 @@
         }
 
         function captureFrameInMemory() {
-            isProcessingCapture = true;
+            isProcessingCapture = true; 
             targetsArray[currentProgress].yaw = 99999; 
 
             canvasEl.width = videoEl.videoWidth || 640;
@@ -320,23 +320,30 @@
                     const blobURL = URL.createObjectURL(blob);
                     targetsArray[currentProgress].imageData = blobURL;
 
-                    // DÜZENLEME: Resmi önce görünmez bir şekilde asset havuzuna ekliyoruz ki A-Frame tanısın
                     let imgAsset = document.createElement('img');
                     imgAsset.id = `shot-${currentProgress}`;
                     imgAsset.src = blobURL;
+                    
+                    imgAsset.onload = () => {
+                        executeShutterEffect();
+                    };
                     assetPool.appendChild(imgAsset);
+                } else {
+                    executeShutterEffect();
                 }
-
-                const flash = document.getElementById('shutter-flash');
-                flash.style.opacity = "1";
-                
-                setTimeout(() => {
-                    flash.style.opacity = "0";
-                    resetHoldUI();
-                    currentProgress++;
-                    syncNavigationState();
-                }, 100);
             }, 'image/jpeg', 0.40);
+        }
+
+        function executeShutterEffect() {
+            const flash = document.getElementById('shutter-flash');
+            flash.style.opacity = "1";
+            
+            setTimeout(() => {
+                flash.style.opacity = "0";
+                resetHoldUI();
+                currentProgress++;
+                syncNavigationState();
+            }, 100);
         }
 
         function startStitchingPhase() {
@@ -355,15 +362,19 @@
                 targetsArray.forEach((node, idx) => {
                     let box = document.getElementById(`box-${idx}`);
                     if (box && node.imageData) {
-                        // DÜZENLEME: Doğrudan blobURL yerine asset havuzundaki ID'yi (#shot-x) bağlıyoruz
-                        box.setAttribute('material', `src: #shot-${idx}; shader: flat; side: double; opacity: 1; transparent: false; color: #ffffff;`);
+                        // OPTİMİZASYON: Kutular 3D uzayda birbirinin üzerine taşacak şekilde iyice büyütüldü.
+                        let isCircle = node.type === 'circle';
+                        box.setAttribute('width', isCircle ? '14' : '7.2');
+                        box.setAttribute('height', isCircle ? '14' : '9.2');
+                        box.setAttribute('position', '0 0 -4.8'); // Derinlik açısı sıkılaştırıldı
+                        
+                        // OPTİMİZASYON: Yeşil ana rengi tamamen nötrlemek için color ve materyal özellikleri sıfırlandı
+                        box.setAttribute('material', `src: #shot-${idx}; shader: flat; side: double; opacity: 1; transparent: false; color: #ffffff; src-loader: true;`);
+                        
                         let dots = box.querySelectorAll('.hud-element');
                         dots.forEach(d => d.remove());
                     }
                 });
-
-                let nadirBox = document.getElementById(`box-21`); 
-                if(nadirBox) { nadirBox.setAttribute('width', '4'); nadirBox.setAttribute('height', '4'); }
 
                 document.getElementById('stitching-screen').style.display = 'none';
                 document.getElementById('reset-btn').style.display = 'block';
