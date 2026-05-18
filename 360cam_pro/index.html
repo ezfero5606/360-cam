@@ -3,21 +3,14 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>360 Photo Cam - Guide Frame Pro</title>
+    <title>360 Photo Cam - Backend Connected</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <style>
         * { box-sizing: border-box; -webkit-user-select: none; user-select: none; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         
-        #webcam-fallback {
-            position: fixed; inset: 0; width: 100%; height: 100%;
-            object-fit: cover; z-index: 1; pointer-events: none;
-        }
-
-        a-scene {
-            position: absolute; inset: 0; width: 100%; height: 100%;
-            z-index: 5; pointer-events: none;
-        }
+        #webcam-fallback { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; pointer-events: none; }
+        a-scene { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
 
         #permission-screen {
             position: fixed; inset: 0; background: #0b0b0b; z-index: 999;
@@ -31,23 +24,13 @@
             box-shadow: 0 6px 20px rgba(0,234,70,0.4);
         }
 
-        #center-hud-layer {
-            position: fixed; inset: 0; z-index: 100;
-            pointer-events: none; display: none;
-        }
+        #center-hud-layer { position: fixed; inset: 0; z-index: 100; pointer-events: none; display: none; }
         
-        /* YENİ: Sabit Kılavuz Dikdörtgen Çerçeve */
         #guide-frame {
-            position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            /* Yeşil alandan biraz daha büyük olacak şekilde ayarlandı */
-            width: 260px; height: 340px; 
-            border: 3px dashed rgba(0, 234, 70, 0.4);
-            border-radius: 12px;
-            transition: all 0.2s ease;
-            box-shadow: inset 0 0 15px rgba(0,0,0,0.3);
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 260px; height: 340px; border: 3px dashed rgba(0, 234, 70, 0.4); border-radius: 12px;
+            transition: all 0.2s ease; box-shadow: inset 0 0 15px rgba(0,0,0,0.3);
         }
-        /* Yeşil alan çerçevenin içine girdiğinde tetiklenecek aktif durum */
         #guide-frame.aligned {
             border: 4px solid #00ea46;
             box-shadow: 0 0 25px rgba(0, 234, 70, 0.5), inset 0 0 10px rgba(0, 234, 70, 0.2);
@@ -55,12 +38,9 @@
         }
 
         #fixed-white-ball {
-            position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 74px; height: 74px;
-            background: rgba(255, 255, 255, 0.95); border-radius: 50%;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            display: flex; align-items: center; justify-content: center;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 74px; height: 74px; background: rgba(255, 255, 255, 0.95); border-radius: 50%;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
         }
         #hold-text { color: #000; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; z-index: 2; }
         #countdown-svg { position: absolute; top: -3px; left: -3px; width: 80px; height: 80px; transform: rotate(-90deg); z-index: 1; pointer-events: none; }
@@ -87,19 +67,16 @@
 
         #stitching-screen {
             position: fixed; inset: 0; background: #000; z-index: 999;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            color: white; display: none;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; display: none;
         }
-        .spinner {
-            width: 50px; height: 50px; border: 5px solid #133a1c; border-top: 5px solid #00ea46;
-            border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px;
-        }
+        .spinner { width: 50px; height: 50px; border: 5px solid #133a1c; border-top: 5px solid #00ea46; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        #success-screen {
-            position: fixed; inset: 0; background: #0b0b0b; z-index: 999;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            color: white; text-align: center; padding: 30px; display: none;
+        #reset-btn {
+            position: fixed; top: 30px; right: 30px; z-index: 200;
+            background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4);
+            padding: 12px 24px; border-radius: 20px; font-weight: bold; backdrop-filter: blur(10px);
+            display: none; cursor: pointer; pointer-events: auto;
         }
     </style>
 </head>
@@ -110,26 +87,21 @@
     <div id="shutter-flash"></div>
 
     <div id="permission-screen">
-        <h2 style="margin-bottom: 10px; color: #00ea46;">360° DATA COLLECTOR</h2>
-        <p class="intro-text">Yeşil alanları sabit kılavuz çerçevenin içine paralel şekilde oturtarak çekimi tamamlayın.</p>
+        <h2 style="margin-bottom: 10px; color: #00ea46;">360° OPENCV LINK</h2>
+        <p class="intro-text">Kılavuz çerçeveyi takip ederek 22 fotoğrafı çekin. Birleştirme bilgisayarda yapılacaktır.</p>
         <button class="start-btn" onclick="initTwinSystem()">Sistemi Başlat</button>
     </div>
 
     <div id="stitching-screen">
         <div class="spinner"></div>
-        <h3 style="margin: 0; letter-spacing: 1px;">VERİLER PAKETLENİYOR</h3>
-        <p style="color: #888; font-size: 14px; margin-top: 8px;">22 Ham Fotoğraf Backend Sunucusuna Gönderilmeye Hazırlanıyor...</p>
+        <h3 id="stitch-status-text" style="margin: 0; letter-spacing: 1px; text-transform: uppercase;">Fotoğraflar Gönderiliyor...</h3>
+        <p id="stitch-sub-text" style="color: #888; font-size: 14px; margin-top: 8px;">Bilgisayardaki OpenCV motoruna yüksek çözünürlüklü veri aktarılıyor.</p>
     </div>
 
-    <div id="success-screen">
-        <h2 style="color: #00ea46; margin-bottom: 15px;">ÇEKİM BAŞARILI!</h2>
-        <p class="intro-text" style="max-width: 320px;">22 Yüksek çözünürlüklü fotoğraf hafızaya alındı. Sunucu dikiş motoru (OpenCV) entegrasyonu için hazırız.</p>
-        <button class="start-btn" style="background: #fff; color: #000; box-shadow: 0 6px 20px rgba(255,255,255,0.2);" onclick="document.location.reload()">Yeniden Başlat</button>
-    </div>
+    <button id="reset-btn" onclick="document.location.reload()">Yeni Çekim</button>
 
     <div id="center-hud-layer">
         <div id="guide-frame"></div>
-        
         <div id="radar-arrow"></div>
         <div id="fixed-white-ball">
             <div id="hold-text"></div>
@@ -147,12 +119,11 @@
 
     <a-scene renderer="alpha: true; colorManagement: true; antialias: true;" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
         <a-assets id="asset-pool"></a-assets>
-
         <a-entity id="rig" rotation="0 0 0">
             <a-entity camera="fov: 75" look-controls="magicWindowTrackingEnabled: true; touchEnabled: false;" id="main-cam" position="0 0 0"></a-entity>
         </a-entity>
-        
         <a-entity id="sphere-world"></a-entity>
+        <a-sky id="final-360-sky" visible="false" rotation="0 -90 0"></a-sky>
     </a-scene>
 
     <script>
@@ -160,20 +131,23 @@
         let targetsArray = [];
         let isStitchedMode = false;
         let isProcessingCapture = false;
-        
-        // BACKEND İÇİN VERİ DEPOSU: Çekilen tüm ham fotoğraflar bu dizide saklanacak
         let capturedImages = []; 
         
+        // BACKEND IP BAĞLANTISI
+        const BACKEND_URL = "http://192.168.0.209:5000/stitch";
+
         const sphereWorld = document.getElementById('sphere-world');
+        const finalSky = document.getElementById('final-360-sky');
         const cameraEl = document.getElementById('main-cam');
         const arrowEl = document.getElementById('radar-arrow');
         const videoEl = document.getElementById('webcam-fallback');
         const canvasEl = document.getElementById('capture-canvas');
         const guideFrame = document.getElementById('guide-frame');
+        const assetPool = document.getElementById('asset-pool');
 
         let isHolding = false;
         let holdStartTime = 0;
-        const HOLD_DURATION = 1100; // Akıcılık için hold süresi hafifçe optimize edildi
+        const HOLD_DURATION = 1100;
 
         function generateSphericalMap() {
             for(let i=0; i<10; i++) targetsArray.push({ pitch: 0, yaw: i*36, row: 'row-mid', type: 'rect' });
@@ -188,7 +162,6 @@
                 pivot.setAttribute('rotation', `${node.pitch} ${-node.yaw} 0`);
                 
                 let targetEl = document.createElement('a-plane');
-                // Yeşil alanın boyutları kılavuz dikdörtgenle tam uyumlu hale getirildi
                 targetEl.setAttribute('width', node.type === 'circle' ? '2.4' : '1.3');
                 targetEl.setAttribute('height', node.type === 'circle' ? '2.4' : '1.7');
                 targetEl.setAttribute('position', '0 0 -3.5');
@@ -199,7 +172,6 @@
                 centerDot.setAttribute('radius', '0.04');
                 centerDot.setAttribute('position', '0 0 0.02');
                 centerDot.setAttribute('material', 'color: white; opacity: 0.6; shader: flat;');
-                centerDot.className = 'hud-element';
                 targetEl.appendChild(centerDot);
                 
                 pivot.appendChild(targetEl);
@@ -223,7 +195,6 @@
                     if (permission !== 'granted') { return alert("Sensör izni reddedildi."); }
                 }
 
-                // ANDROID OPTİMİZASYONU: Arka planda yüksek kaliteli ham veri toplamak için çözünürlüğü HD yaptık
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
                 videoEl.srcObject = stream;
 
@@ -243,21 +214,19 @@
 
         function syncNavigationState() {
             if (currentProgress >= targetsArray.length) {
-                packageCollectedData();
+                sendDataToBackendServer();
                 return;
             }
 
             if (currentProgress > 0) {
                 let prevBox = document.getElementById(`box-${currentProgress-1}`);
                 if (prevBox) prevBox.setAttribute('material', 'color: #00ea46; opacity: 0.2;');
-                
                 let prevDot = document.getElementById(`dot-${currentProgress-1}`);
                 if (prevDot) { prevDot.classList.remove('current'); prevDot.classList.add('active'); }
             }
 
             let activeBox = document.getElementById(`box-${currentProgress}`);
             if (activeBox) activeBox.setAttribute('material', 'color: #00ea46; opacity: 0.85;');
-
             let activeDot = document.getElementById(`dot-${currentProgress}`);
             if (activeDot) activeDot.classList.add('current');
             
@@ -272,10 +241,8 @@
             if (!camRot) return;
 
             let target = targetsArray[currentProgress];
-
             let diffPitch = target.pitch - camRot.x;
             diffPitch = (diffPitch + 180) % 360 - 180;
-
             let diffYaw = (-target.yaw) - camRot.y;
             diffYaw = (diffYaw + 180) % 360 - 180;
 
@@ -289,14 +256,10 @@
 
             let isZenithNadir = Math.abs(target.pitch) === 90;
             let yawThreshold = isZenithNadir ? 360 : 4.5;
-            let pitchThreshold = 4.5; // Hizalama hassasiyeti kılavuza göre sıkılaştırıldı
+            let pitchThreshold = 4.5;
 
-            // Yeşil alan, sabit kılavuz dikdörtgenin sınırları içerisine paralel girdiğinde
             if (Math.abs(diffPitch) < pitchThreshold && Math.abs(diffYaw) < yawThreshold) {
-                
-                // YENİ: Sabit çerçevenin rengini aktife çek ve parlat
                 guideFrame.classList.add('aligned');
-
                 if (!isHolding) {
                     isHolding = true;
                     holdStartTime = performance.now();
@@ -311,7 +274,6 @@
                     }
                 }
             } else {
-                // Sınırlardan çıkıldığında çerçeve stilini eski haline getir
                 guideFrame.classList.remove('aligned');
                 if (isHolding) { resetHoldUI(); }
             }
@@ -325,23 +287,14 @@
 
         function captureHighResFrame() {
             isProcessingCapture = true; 
-
             canvasEl.width = videoEl.videoWidth || 1280;
             canvasEl.height = videoEl.videoHeight || 720;
             const ctx = canvasEl.getContext('2d');
-            
             ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
             
-            // Backend dikiş motoru için kaliteyi %85'e çıkardık (Daha net detaylar için)
             canvasEl.toBlob((blob) => {
                 if(blob) {
-                    // Fotoğrafı ham veri olarak diziye ekliyoruz
-                    capturedImages.push({
-                        id: currentProgress,
-                        pitch: targetsArray[currentProgress].pitch,
-                        yaw: targetsArray[currentProgress].yaw,
-                        data: blob
-                    });
+                    capturedImages.push(blob);
                 }
                 executeShutterEffect();
             }, 'image/jpeg', 0.85);
@@ -350,7 +303,6 @@
         function executeShutterEffect() {
             const flash = document.getElementById('shutter-flash');
             flash.style.opacity = "1";
-            
             setTimeout(() => {
                 flash.style.opacity = "0";
                 resetHoldUI();
@@ -360,27 +312,60 @@
             }, 100);
         }
 
-        // 22 fotoğraf başarıyla toplandığında tetiklenen veri paketleme ekranı
-        function packageCollectedData() {
+        // 🚀 VERİYİ PYTHON BACKEND'E POSTALAYAN YENİ FONKSİYON
+        function sendDataToBackendServer() {
             isStitchedMode = true;
-            
             document.getElementById('center-hud-layer').style.display = 'none';
             document.getElementById('matrix-panel').style.display = 'none';
             document.getElementById('stitching-screen').style.display = 'flex';
 
-            setTimeout(() => {
-                videoEl.style.display = 'none';
-                if(videoEl.srcObject) {
-                    videoEl.srcObject.getTracks().forEach(track => track.stop());
-                }
+            videoEl.style.display = 'none';
+            if(videoEl.srcObject) { videoEl.srcObject.getTracks().forEach(track => track.stop()); }
 
-                document.getElementById('stitching-screen').style.display = 'none';
-                document.getElementById('success-screen').style.display = 'flex';
+            // HTTP Gönderim Paketi (FormData) oluşturuluyor
+            const formData = new FormData();
+            capturedImages.forEach((blob, idx) => {
+                formData.append(`image_${idx}`, blob, `shot_${idx}.jpg`);
+            });
+
+            document.getElementById('stitch-status-text').innerText = "KÜRE ÖRÜLÜYOR...";
+            document.getElementById('stitch-sub-text').innerText = "OpenCV gelişmiş pikselsel bükme ve harmanlama uyguluyor. Lütfen bekleyin...";
+
+            // Python Sunucusuna İstek Atma
+            fetch(BACKEND_URL, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if(!response.ok) throw new Error("Dikiş motoru birleştirme hatası verdi.");
+                return response.blob();
+            })
+            .then(imageBlob => {
+                // Sunucudan gelen pürüzsüz 360° panoramayı A-Frame'e giydirme
+                const finalPanoURL = URL.createObjectURL(imageBlob);
                 
-                // Konsola hazır olan ham veri paketini basıyoruz (Geliştirme aşaması takibi için)
-                console.log("Backend Entegrasyonu İçin Hazırlanan Veri Paketi:", capturedImages);
+                let imgAsset = document.createElement('img');
+                imgAsset.id = 'final-stitched-pano';
+                imgAsset.src = finalPanoURL;
+                
+                imgAsset.onload = () => {
+                    sphereWorld.setAttribute('visible', 'false');
+                    finalSky.setAttribute('src', '#final-stitched-pano');
+                    finalSky.setAttribute('visible', 'true');
+                    
+                    cameraEl.setAttribute('look-controls', 'magicWindowTrackingEnabled: true; touchEnabled: true;');
+                    document.querySelector('a-scene').style.pointerEvents = 'auto';
 
-            }, 2000); 
+                    document.getElementById('stitching-screen').style.display = 'none';
+                    document.getElementById('reset-btn').style.display = 'block';
+                };
+                assetPool.appendChild(imgAsset);
+            })
+            .catch(err => {
+                alert("Hata: " + err.message + "\nLütfen bilgisayardaki siyah ekranı ve bağlantıları kontrol edin.");
+                document.getElementById('stitching-screen').style.display = 'none';
+                document.getElementById('reset-btn').style.display = 'block';
+            });
         }
     </script>
 </body>
