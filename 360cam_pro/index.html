@@ -209,7 +209,8 @@
                     if (permission !== 'granted') { return alert("Sensör izni reddedildi."); }
                 }
 
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+                // DÜZENLEME: RAM'i kurtarmak için kamera çözünürlüğü 640x480 (VGA) olarak hafifletildi.
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
                 videoEl.srcObject = stream;
 
                 document.getElementById('permission-screen').style.display = 'none';
@@ -302,28 +303,25 @@
         function captureFrameInMemory() {
             targetsArray[currentProgress].yaw = 99999; 
 
-            canvasEl.width = videoEl.videoWidth || 1280;
-            canvasEl.height = videoEl.videoHeight || 720;
+            canvasEl.width = videoEl.videoWidth || 640;
+            canvasEl.height = videoEl.videoHeight || 480;
             const ctx = canvasEl.getContext('2d');
             
             ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
             
-            // Fotoğraf kalitesi RAM dostu seviyede tutuluyor
-            const dataURL = canvasEl.toDataURL('image/jpeg', 0.55);
+            // DÜZENLEME: RAM yükünü tamamen sıfırlamak için sıkıştırma oranı 0.40 yapıldı
+            const dataURL = canvasEl.toDataURL('image/jpeg', 0.40);
             targetsArray[currentProgress].imageData = dataURL;
 
-            // DÜZENLEME: Flaş ekranını hemen opak yapıyoruz
             const flash = document.getElementById('shutter-flash');
             flash.style.opacity = "1";
             
-            // DÜZENLEME: Flaş süresi 400ms'den gerçek kamera hızı olan 100ms'ye indirildi.
-            // Böylece şak diye sönüp işlemciyi kilitlemeyecek.
             setTimeout(() => {
                 flash.style.opacity = "0";
                 resetHoldUI();
                 currentProgress++;
                 syncNavigationState();
-            }, 100);
+            }, 100); // Flaş hızı korundu
         }
 
         function startStitchingPhase() {
