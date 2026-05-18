@@ -150,6 +150,7 @@
         let currentProgress = 0;
         let targetsArray = [];
         let isStitchedMode = false;
+        let isProcessingCapture = false; // Çekim anında motorun kilitlenmesini önlemek için kilit
         
         const sphereWorld = document.getElementById('sphere-world');
         const cameraEl = document.getElementById('main-cam');
@@ -209,7 +210,6 @@
                     if (permission !== 'granted') { return alert("Sensör izni reddedildi."); }
                 }
 
-                // DÜZENLEME: RAM'i kurtarmak için kamera çözünürlüğü 640x480 (VGA) olarak hafifletildi.
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
                 videoEl.srcObject = stream;
 
@@ -246,11 +246,13 @@
 
             let activeDot = document.getElementById(`dot-${currentProgress}`);
             if (activeDot) activeDot.classList.add('current');
+            
+            isProcessingCapture = false; // Çekim ve geçiş bitti, motoru serbest bırak
         }
 
         function runTrackingEngine() {
             requestAnimationFrame(runTrackingEngine);
-            if (isStitchedMode || currentProgress >= targetsArray.length) return;
+            if (isStitchedMode || isProcessingCapture || currentProgress >= targetsArray.length) return;
 
             let camRot = cameraEl.getAttribute('rotation');
             if (!camRot) return;
@@ -301,6 +303,7 @@
         }
 
         function captureFrameInMemory() {
+            isProcessingCapture = true; // Çekim başladı, çakışmayı önlemek için motoru kilitle
             targetsArray[currentProgress].yaw = 99999; 
 
             canvasEl.width = videoEl.videoWidth || 640;
@@ -309,19 +312,23 @@
             
             ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
             
-            // DÜZENLEME: RAM yükünü tamamen sıfırlamak için sıkıştırma oranı 0.40 yapıldı
-            const dataURL = canvasEl.toDataURL('image/jpeg', 0.40);
-            targetsArray[currentProgress].imageData = dataURL;
+            // YENİ OPTİMİZASYON: toDataURL yerine toBlob kullanarak RAM yığılmasını engelledik
+            canvasEl.toBlob((blob) => {
+                if(blob) {
+                    const blobURL = URL.createObjectURL(blob);
+                    targetsArray[currentProgress].imageData = blobURL;
+                }
 
-            const flash = document.getElementById('shutter-flash');
-            flash.style.opacity = "1";
-            
-            setTimeout(() => {
-                flash.style.opacity = "0";
-                resetHoldUI();
-                currentProgress++;
-                syncNavigationState();
-            }, 100); // Flaş hızı korundu
+                const flash = document.getElementById('shutter-flash');
+                flash.style.opacity = "1";
+                
+                setTimeout(() => {
+                    flash.style.opacity = "0";
+                    resetHoldUI();
+                    currentProgress++;
+                    syncNavigationState();
+                }, 100); // Gerçekçi hızlı flaş patlaması
+            }, 'image/jpeg', 0.40);
         }
 
         function startStitchingPhase() {
